@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // --- User profiles (created by Auth.tsx on signup) ---
+    match /users/{uid} {
+      // Any signed-in user can look up a partner's name/avatar/availability.
+      allow read: if isSignedIn();
+      // Only the owner can create or edit their own profile.
+      allow create, update: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    // --- Connection / supply requests (Requests.tsx "sent" & "received") ---
+    match /requests/{requestId} {
+      // Visible to the sender, the direct recipient, or everyone (broadcast requests).
+      allow read: if isSignedIn() && (
+        resource.data.fromUid == request.auth.uid ||
+        resource.data.toUid == request.auth.uid ||
+        resource.data.toUid == null
+      );
+
+      // Only the sender can create a request, and only in the 'pending' state.
+      allow create: if isSignedIn() &&
+        request.resource.data.fromUid == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      // The sender may cancel their own request; the recipient (or, for a
+      // broadcast request, whoever claims it) may approve/deny it.
+      allow update: if isSignedIn() && (
+        resource.data.fromUid == request.auth.uid ||
+        resource.data.toUid == request.auth.uid ||
+        (resource.data.toUid == null && request.resource.data.toUid == request.auth.uid)
+      );
+
+      allow delete: if isSignedIn() && resource.data.fromUid == request.auth.uid;
+    }
+
+    // --- Chats & messages (Messages.tsx "messages sent" & "messages received") ---
+    match /chats/{chatId} {
+      allow read, update: if isSignedIn() && request.auth.uid in resource.data.participantUids;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participantUids;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids;
+
+        allow create: if isSignedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids &&
+          request.resource.data.senderId == request.auth.uid;
+
+        allow update, delete: if false;
+      }
+    }
+  }
+}
