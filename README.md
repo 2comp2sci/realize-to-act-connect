@@ -1,15 +1,14 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
-# Run and deploy your AI Studio app  
+# Run and deploy your app  
 
 This contains everything you need to run your app locally. 
 
 View your app in AI Studio: https://ai.studio/apps/59cd6b78-5cda-4041-b02b-8824bc64eb14
 
+## Disclaimer
+Many features are broken. Will release separate .md detailing features in progress and those that are functional (internally).
+
 ## Run Locally
--- generic instructions from Firebase CLI Gemini AI something something something
+-- generic instructions from Firebase CLI Gemini AI something something something... anyways 
 **Prerequisites:**  Node.js
 
 
