@@ -2,14 +2,14 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# Run and deploy your AI Studio app  
 
-This contains everything you need to run your app locally.
+This contains everything you need to run your app locally. 
 
 View your app in AI Studio: https://ai.studio/apps/59cd6b78-5cda-4041-b02b-8824bc64eb14
 
 ## Run Locally
-
+-- generic instructions from Firebase CLI Gemini AI something something something
 **Prerequisites:**  Node.js
 
 
@@ -20,7 +20,7 @@ View your app in AI Studio: https://ai.studio/apps/59cd6b78-5cda-4041-b02b-8824b
    `npm run dev`
 
 ## Backend: Firebase Auth + Firestore
-
+-- this is more specific to this app.
 Messages, chats, and connection/supply requests (sent & received) are stored
 in Cloud Firestore and read live via `onSnapshot` — there is no separate
 server. The data-access code lives in `src/lib/requests.ts` and
@@ -28,7 +28,7 @@ server. The data-access code lives in `src/lib/requests.ts` and
 of those files and in `firestore.rules`.
 
 ### One-time Firebase project setup
-
+--done already on MM laptop (mine)
 1. Create a project at https://console.firebase.google.com, then enable
    **Authentication** (Email/Password + Google providers) and **Firestore**.
 2. In Project Settings > General > "Your apps", add a Web app and copy its
@@ -39,7 +39,7 @@ of those files and in `firestore.rules`.
 4. Install the Firebase CLI if you don't have it: `npm install -g firebase-tools`,
    then `firebase login`.
 
-### Deploying
+### Deploying -- some helpful commands xoxo
 
 ```
 npm run build   # outputs to dist/, matches firebase.json's hosting.public
