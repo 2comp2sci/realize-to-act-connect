@@ -11,6 +11,8 @@ import { MOCK_CONNECTIONS, MOCK_DOCUMENTS, MOCK_SUGGESTED_MATCHES } from './mock
 import { User, ConnectionRequest, Document, Chat } from './types';
 import { respondToRequest } from './lib/requests';
 import { ensureChat } from './lib/chats';
+import { PartnerSummary } from './PartnerAbout';
+import { connectOnApprovedRequest } from './lib/connections';
 
 interface DashboardProps {
   user: User;
@@ -25,6 +27,7 @@ interface DashboardProps {
   lastActionTime: string;
   updateLastAction: () => void;
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
+  onViewPartner: (partner: PartnerSummary) => void;
 }
 
 export default function Dashboard({ 
@@ -33,7 +36,7 @@ export default function Dashboard({
   connections, setConnections,
   documents, setDocuments,
   lastActionTime, updateLastAction,
-  setChats
+  setChats, onViewPartner
 }: DashboardProps) {
   const pendingConnections = connections.filter(c => c.status === 'pending' && c.type === 'received');
   const pendingDocs = documents.filter(d => d.status === 'pending');
@@ -48,6 +51,13 @@ export default function Dashboard({
         connection.fromId,
         { name: connection.fromName, title: '', avatar: connection.fromAvatar }
       );
+      // Organizations that exchange resources are automatically connected.
+      // A failure here shouldn't undo or block the approval itself.
+      await connectOnApprovedRequest(
+        { uid: user.id, name: user.name, avatar: user.avatar, type: user.type },
+        { uid: connection.fromId, name: connection.fromName, avatar: connection.fromAvatar },
+        id
+      ).catch(err => console.error('Auto-connect failed', err));
       updateLastAction();
 
       // Add to pending signatures
@@ -202,12 +212,20 @@ export default function Dashboard({
               {pendingConnections.length > 0 ? (
                 pendingConnections.map((conn) => (
                   <div key={conn.id} className="p-4 rounded-[5px] border border-slate-100 hover:border-brand-primary/20 transition-all flex flex-col sm:flex-row gap-4">
-                    <div className="w-16 h-16 rounded-[5px] overflow-hidden flex-shrink-0">
+                    <button
+                      onClick={() => onViewPartner({ uid: conn.fromId, name: conn.fromName, avatar: conn.fromAvatar })}
+                      className="w-16 h-16 rounded-[5px] overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity"
+                    >
                       <img src={conn.fromAvatar} alt={conn.fromName} className="w-full h-full object-cover" />
-                    </div>
+                    </button>
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-bold text-brand-dark">{conn.fromName}</h3>
+                        <button
+                          onClick={() => onViewPartner({ uid: conn.fromId, name: conn.fromName, avatar: conn.fromAvatar })}
+                          className="font-bold text-brand-dark text-left hover:text-brand-primary hover:underline"
+                        >
+                          {conn.fromName}
+                        </button>
                         <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-black text-[10px] font-medium opacity-50">Pending</span>
                       </div>
                       <p className="text-sm text-slate-500 line-clamp-2 mb-3">{conn.description}</p>

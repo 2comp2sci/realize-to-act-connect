@@ -9,12 +9,15 @@ import Documents from './Documents';
 import Messages from './Messages';
 import Profile from './Profile';
 import Search from './Search';
-import { User, UserType, ConnectionRequest, Chat, Document } from './types';
+import PartnerAbout, { PartnerSummary } from './PartnerAbout';
+import ProfileSetup from './ProfileSetup';
+import { User, UserType, ConnectionRequest, Chat, Document, Connection } from './types';
 import { MOCK_USER, MOCK_DOCUMENTS as INITIAL_DOCUMENTS } from './mockData';
 import { auth } from './lib/firebase';
 import { getUserProfile } from './lib/users';
 import { subscribeToRequests } from './lib/requests';
 import { subscribeToChats } from './lib/chats';
+import { subscribeToConnections } from './lib/connections';
 
 // Builds the in-app User object for a signed-in Firebase uid, layering the
 // Firestore "users/{uid}" profile (org name, availability, etc.) on top of
@@ -38,9 +41,13 @@ export default function App() {
   const [connections, setConnections] = useState<ConnectionRequest[]>([]);
   const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
   const [chats, setChats] = useState<Chat[]>([]);
+  // Organization-to-organization connections; `connections` above holds resource requests.
+  const [partnerConnections, setPartnerConnections] = useState<Connection[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState<{ text: string; isSuggestedTime?: boolean; suggestedTimes?: string[]; meetingNote?: string } | null>(null);
   const [lastActionTime, setLastActionTime] = useState<string>('');
+  const [viewingPartner, setViewingPartner] = useState<PartnerSummary | null>(null);
+  const [tabBeforePartner, setTabBeforePartner] = useState('dashboard');
 
   const updateLastAction = () => {
     const now = new Date();
@@ -75,13 +82,16 @@ export default function App() {
     if (!user) {
       setConnections([]);
       setChats([]);
+      setPartnerConnections([]);
       return;
     }
     const unsubscribeRequests = subscribeToRequests(user.id, setConnections);
     const unsubscribeChats = subscribeToChats(user.id, setChats);
+    const unsubscribeConnections = subscribeToConnections(user.id, setPartnerConnections);
     return () => {
       unsubscribeRequests();
       unsubscribeChats();
+      unsubscribeConnections();
     };
   }, [user?.id]);
 
@@ -100,6 +110,14 @@ export default function App() {
   const navigateToChat = (chatId: string) => {
     setSelectedChatId(chatId);
     setActiveTab('messages');
+  };
+
+  // Opens a school/community partner's About page, remembering where the
+  // user came from so "Back" returns there.
+  const viewPartner = (partner: PartnerSummary) => {
+    if (activeTab !== 'about') setTabBeforePartner(activeTab);
+    setViewingPartner(partner);
+    setActiveTab('about');
   };
 
   const handleUpdateUser = (updatedUser: User) => {
@@ -134,6 +152,18 @@ export default function App() {
     return <Auth onLogin={handleLogin} />;
   }
 
+  // Prompt for About page details once, right after signup (or on the first
+  // login after this step was added). Skipping is remembered too.
+  if (!user.setupCompletedAt && !user.setupSkippedAt) {
+    return (
+      <ProfileSetup
+        user={user}
+        variant="onboarding"
+        onDone={(updates) => setUser({ ...user, ...updates })}
+      />
+    );
+  }
+
   return (
     <Layout 
       user={user} 
@@ -157,6 +187,7 @@ export default function App() {
           lastActionTime={lastActionTime}
           updateLastAction={updateLastAction}
           setChats={setChats}
+          onViewPartner={viewPartner}
         />
       )}
       {activeTab === 'requests' && (
@@ -164,6 +195,16 @@ export default function App() {
           connections={connections} 
           setConnections={setConnections} 
           user={user}
+          onViewPartner={viewPartner}
+          partnerConnections={partnerConnections}
+        />
+      )}
+      {activeTab === 'about' && viewingPartner && (
+        <PartnerAbout
+          partner={viewingPartner}
+          user={user}
+          connections={connections}
+          onBack={() => setActiveTab(tabBeforePartner)}
         />
       )}
       {activeTab === 'messages' && (
@@ -191,6 +232,8 @@ export default function App() {
         <Search 
           connections={connections}
           setConnections={setConnections}
+          user={user}
+          partnerConnections={partnerConnections}
         />
       )}
       {activeTab === 'profile' && (

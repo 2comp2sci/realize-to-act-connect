@@ -16,6 +16,9 @@ export interface User {
   availability?: AvailabilitySlot[];
   dropOffLocation?: string;
   needDropOffAssistance?: boolean;
+  profileAnswers?: Record<string, string | string[]>;
+  setupCompletedAt?: string;
+  setupSkippedAt?: string;
 }
 
 export interface ConnectionRequest {
@@ -35,6 +38,29 @@ export interface ConnectionRequest {
   description?: string;
   availability?: AvailabilitySlot[];
   isNew?: boolean;
+}
+
+// A LinkedIn-style connection between two organizations (src/lib/connections.ts),
+// as seen by the signed-in user. Not to be confused with ConnectionRequest,
+// which is a resource/supply request.
+export interface Connection {
+  id: string;
+  partnerUid: string;
+  partnerName: string;
+  partnerAvatar?: string;
+  partnerType?: UserType;
+  status: 'pending' | 'accepted';
+  direction: 'incoming' | 'outgoing';
+  source: 'search' | 'request';
+  timestamp: number;
+}
+
+export interface Organization {
+  uid: string;
+  name: string;
+  type: UserType;
+  avatar?: string;
+  location?: string;
 }
 
 export interface Document {
