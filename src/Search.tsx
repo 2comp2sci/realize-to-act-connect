@@ -1,35 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search as SearchIcon, MapPin, Plus, Check, Filter, ChevronDown, 
   Map as MapIcon, List, X, Clock, Calendar, MessageSquare,
-  Utensils, Backpack, Shirt, Book, Library, Laptop, Home as HomeIcon, Palette, Package,
-  UserPlus, School, Heart
+  Utensils, Backpack, Shirt, Book, Library, Laptop, Home as HomeIcon, Palette, Package
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
-import { MOCK_SEARCH_USERS } from './mockData';
-import { Connection, ConnectionRequest, Organization, User } from './types';
-import { acceptConnection, listOrganizations, sendConnectionRequest } from './lib/connections';
+import { collection, getDocs } from 'firebase/firestore';
+import { db, auth } from './lib/firebase';
+import { ConnectionRequest, User } from './types';
+import { recordSchoolSentRequest, subscribeToSchoolSentRequests, createRequest } from './lib/requests';
 
 interface SearchProps {
   connections: ConnectionRequest[];
   setConnections: React.Dispatch<React.SetStateAction<ConnectionRequest[]>>;
-  user: User;
-  partnerConnections: Connection[];
+  user?: User;
 }
 
-export default function Search({ connections, setConnections, user, partnerConnections }: SearchProps) {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [connectingUid, setConnectingUid] = useState<string | null>(null);
-  const [connectError, setConnectError] = useState('');
-
-  useEffect(() => {
-    listOrganizations(user.id).then(setOrganizations).catch(() => setOrganizations([]));
-  }, [user.id]);
-
+export default function Search({ connections, setConnections, user }: SearchProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [radius, setRadius] = useState(10);
+  const [radius, setRadius] = useState(50);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [addedIds, setAddedIds] = useState<string[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -38,12 +29,74 @@ export default function Search({ connections, setConnections, user, partnerConne
   const [selectedPartnerForRequest, setSelectedPartnerForRequest] = useState<any>(null);
   const [isBroadcastRequest, setIsBroadcastRequest] = useState(false);
   const [sentIds, setSentIds] = useState<string[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
 
   // Form state for new request
   const [newRequestItem, setNewRequestItem] = useState('');
   const [newRequestOtherItem, setNewRequestOtherItem] = useState('');
   const [newRequestQuantity, setNewRequestQuantity] = useState('');
   const [newRequestDetails, setNewRequestDetails] = useState('');
+
+  React.useEffect(() => {
+    const loadPartners = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'users'));
+
+        const users = snapshot.docs
+          .filter(doc => doc.data().userType === 'community-partner')
+          .map(doc => {
+            const data = doc.data();
+
+            return {
+              id: doc.id,
+              name: data.orgName ?? data.contactName ?? 'Unnamed Organization',
+              avatar: data.avatar ?? '',
+              description: data.description ?? '',
+              distance: 'N/A',
+              distanceValue: 0,
+              tags: Array.isArray(data.tags) && data.tags.length > 0 ? data.tags : ['General'],
+              quantity: typeof data.quantity === 'number' ? data.quantity : 0,
+              postedAt: data.postedAt ?? '',
+              availableUntil: data.availableUntil ?? '',
+              isConnected: false,
+            };
+          });
+
+        setPartners(users);
+      } catch (error) {
+        console.error('Error loading community partners:', error);
+      }
+    };
+
+    loadPartners();
+  }, []);
+
+  // Listen to requests stored in the 'requests-sent' collection for the current user
+  React.useEffect(() => {
+    const currentUid = user?.id || auth.currentUser?.uid;
+    if (!currentUid) return;
+
+    const unsubscribe = subscribeToSchoolSentRequests(currentUid, (sentList) => {
+      const ids: string[] = [];
+      sentList.forEach((req) => {
+        if (req.communityPartnerId) ids.push(req.communityPartnerId);
+        if (req.communityPartner) ids.push(req.communityPartner);
+      });
+      setSentIds((prev) => Array.from(new Set([...prev, ...ids])));
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  // Also sync from active sent connections
+  React.useEffect(() => {
+    const sentFromConnections = connections
+      .filter((c) => c.type === 'sent')
+      .flatMap((c) => [c.fromId, c.fromName]);
+    if (sentFromConnections.length > 0) {
+      setSentIds((prev) => Array.from(new Set([...prev, ...sentFromConnections])));
+    }
+  }, [connections]);
 
   const getSupplyIcon = (item: string) => {
     const lowerItem = item.toLowerCase();
@@ -58,84 +111,33 @@ export default function Search({ connections, setConnections, user, partnerConne
     return <Package size={16} className="text-brand-primary" />;
   };
 
-  const connectionWith = (uid: string) => partnerConnections.find(c => c.partnerUid === uid);
-
-  // Registered organizations can be connected with; "Connected" reflects an
-  // accepted connection (sent from here, or made by approving a resource request).
+  const partnerIds = new Set(partners.map(p => p.id));
   const allPartners = [
-    ...organizations.map(org => ({
-      id: org.uid,
-      uid: org.uid,
-      name: org.name,
-      avatar: org.avatar,
-      orgType: org.type,
-      location: org.location,
-      description: '',
-      distance: '',
-      distanceValue: 0,
-      tags: [] as string[],
-      isConnected: connectionWith(org.uid)?.status === 'accepted',
-    })),
-    ...MOCK_SEARCH_USERS.map(u => ({ ...u, isConnected: false }))
+    ...partners,
+    ...connections.filter(c => c.status === 'approved' && !partnerIds.has(c.fromId)).map(c => ({
+      id: c.fromId,
+      name: c.fromName,
+      avatar: c.fromAvatar,
+      description: c.description || '',
+      distance: c.distance,
+      distanceValue: parseFloat(c.distance) || 0,
+      tags: c.item ? [c.item] : ['General'],
+      quantity: c.quantity,
+      postedAt: c.postedAt,
+      availableUntil: c.availableUntil,
+      isConnected: true,
+      timeAgo: c.timeAgo
+    }))
   ];
-
-  const handleConnect = async (partner: any) => {
-    const existing = connectionWith(partner.uid);
-    setConnectingUid(partner.uid);
-    setConnectError('');
-    try {
-      if (existing?.status === 'pending' && existing.direction === 'incoming') {
-        await acceptConnection(existing.id);
-      } else if (!existing) {
-        await sendConnectionRequest(
-          { uid: user.id, name: user.name, avatar: user.avatar, type: user.type },
-          { uid: partner.uid, name: partner.name, avatar: partner.avatar, type: partner.orgType }
-        );
-      }
-    } catch (err) {
-      console.error('Connect failed', err);
-      setConnectError(`Couldn't connect with ${partner.name}. Please try again.`);
-    } finally {
-      setConnectingUid(null);
-    }
-  };
-
-  const renderConnectButton = (partner: any) => {
-    const existing = connectionWith(partner.uid);
-    const isIncoming = existing?.status === 'pending' && existing.direction === 'incoming';
-    return (
-      <button
-        onClick={() => handleConnect(partner)}
-        disabled={connectingUid === partner.uid || (!!existing && !isIncoming)}
-        className={cn(
-          "w-[140px] py-2.5 rounded-[5px] font-bold text-sm transition-all flex items-center justify-center gap-2",
-          existing?.status === 'accepted'
-            ? "bg-emerald-50 text-emerald-700 cursor-default"
-            : existing && !isIncoming
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-              : "border border-brand-primary text-brand-primary bg-white hover:bg-brand-secondary/20"
-        )}
-      >
-        {existing?.status === 'accepted' ? (
-          <><Check size={16} /> Connected</>
-        ) : isIncoming ? (
-          <><Check size={16} /> Accept</>
-        ) : existing ? (
-          'Pending'
-        ) : (
-          <><UserPlus size={16} /> Connect</>
-        )}
-      </button>
-    );
-  };
 
   const filteredPartners = allPartners.filter(partner => {
     const matchesSearch = partner.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          partner.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         partner.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+                         partner.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    const matchesType = filterType === 'all' || partner.tags.some(tag => tag.toLowerCase().includes(filterType.toLowerCase()));
-    const matchesRadius = partner.distanceValue <= radius;
+    const matchesType = filterType === 'all' || partner.tags.some((tag: string) => tag.toLowerCase().includes(filterType.toLowerCase()));
+    // Skip radius check when distance is unknown (real Firestore users without geolocation)
+    const matchesRadius = partner.distance === 'N/A' || partner.distanceValue <= radius;
     const isNotExpired = partner.availableUntil !== 'Expired';
 
     return matchesSearch && matchesType && matchesRadius && isNotExpired;
@@ -191,37 +193,94 @@ export default function Search({ connections, setConnections, user, partnerConne
     setShowCreateRequest(true);
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
     if (!newRequestItem || !newRequestQuantity) return;
     if (!isBroadcastRequest && !selectedPartnerForRequest) return;
 
     const finalItem = newRequestItem === 'other' ? newRequestOtherItem : newRequestItem;
+    const qty = parseInt(newRequestQuantity, 10) || 0;
+    const currentUid = user?.id || auth.currentUser?.uid || 'user-1';
+    const schoolName = user?.name || 'School';
+    const schoolAvatar = user?.avatar || 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=150&h=150&fit=crop';
 
-    const newRequest: ConnectionRequest = {
-      id: `sent-${Date.now()}`,
-      fromId: 'user-1',
-      fromName: isBroadcastRequest ? 'Broadcast Request (All Partners)' : selectedPartnerForRequest.name,
-      fromAvatar: isBroadcastRequest 
-        ? 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=150&h=150&fit=crop' 
-        : selectedPartnerForRequest.avatar,
-      type: 'sent',
-      status: 'pending',
-      item: finalItem,
-      quantity: parseInt(newRequestQuantity),
-      distance: isBroadcastRequest ? 'N/A' : selectedPartnerForRequest.distance,
-      timeAgo: 'Just now',
-      timestamp: Date.now(),
-      description: newRequestDetails,
-      postedAt: isBroadcastRequest ? 'Just now' : selectedPartnerForRequest.postedAt,
-      availableUntil: isBroadcastRequest ? 'Indefinite' : selectedPartnerForRequest.availableUntil
-    };
-
-    setConnections(prev => [newRequest, ...prev]);
     if (isBroadcastRequest) {
-      setSentIds(prev => [...prev, ...filteredPartners.map((p: any) => p.id)]);
+      for (const partner of filteredPartners) {
+        try {
+          await recordSchoolSentRequest({
+            userId: currentUid,
+            fromName: schoolName,
+            communityPartner: partner.name,
+            communityPartnerId: partner.id,
+            item: finalItem,
+            quantity: qty,
+            additionalDetails: newRequestDetails,
+          });
+        } catch (err) {
+          console.error('Error saving request to requests-sent:', err);
+        }
+      }
+
+      try {
+        await createRequest({
+          fromUid: currentUid,
+          fromName: schoolName,
+          fromAvatar: schoolAvatar,
+          toUid: null,
+          toName: null,
+          toAvatar: null,
+          item: finalItem,
+          quantity: qty,
+          distance: 'N/A',
+          description: newRequestDetails,
+        });
+      } catch (err) {
+        console.error('Error creating broadcast request in requests collection:', err);
+      }
+
+      setSentIds((prev) => Array.from(new Set([
+        ...prev,
+        ...filteredPartners.map((p: any) => p.id),
+        ...filteredPartners.map((p: any) => p.name),
+      ])));
     } else if (selectedPartnerForRequest) {
-      setSentIds(prev => [...prev, selectedPartnerForRequest.id]);
+      try {
+        await recordSchoolSentRequest({
+          userId: currentUid,
+          fromName: schoolName,
+          communityPartner: selectedPartnerForRequest.name,
+          communityPartnerId: selectedPartnerForRequest.id,
+          item: finalItem,
+          quantity: qty,
+          additionalDetails: newRequestDetails,
+        });
+      } catch (err) {
+        console.error('Error saving request to requests-sent:', err);
+      }
+
+      try {
+        await createRequest({
+          fromUid: currentUid,
+          fromName: schoolName,
+          fromAvatar: schoolAvatar,
+          toUid: selectedPartnerForRequest.id,
+          toName: selectedPartnerForRequest.name,
+          toAvatar: selectedPartnerForRequest.avatar,
+          item: finalItem,
+          quantity: qty,
+          distance: selectedPartnerForRequest.distance,
+          description: newRequestDetails,
+        });
+      } catch (err) {
+        console.error('Error creating request in requests collection:', err);
+      }
+
+      setSentIds((prev) => Array.from(new Set([
+        ...prev,
+        selectedPartnerForRequest.id,
+        selectedPartnerForRequest.name,
+      ])));
     }
+
     setShowCreateRequest(false);
     
     // Reset form
@@ -303,12 +362,6 @@ export default function Search({ connections, setConnections, user, partnerConne
               </div>
         </div>
 
-        {connectError && (
-          <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-[5px] text-red-600 text-sm">
-            {connectError}
-          </div>
-        )}
-
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-bold text-brand-dark">Community Partners</h2>
           <button 
@@ -331,6 +384,7 @@ export default function Search({ connections, setConnections, user, partnerConne
               >
                 {filteredPartners.map((item: any) => {
                   const isAdded = item.isConnected || addedIds.includes(item.id);
+                  const isSent = sentIds.includes(item.id) || sentIds.includes(item.name);
                   
                   return (
                     <motion.div 
@@ -340,12 +394,8 @@ export default function Search({ connections, setConnections, user, partnerConne
                       animate={{ opacity: 1, y: 0 }}
                       className="p-6 rounded-[5px] border border-slate-100 hover:border-brand-primary/20 transition-all flex flex-col sm:flex-row gap-6 bg-white group shadow-none relative"
                     >
-                      <div className="w-20 h-20 rounded-[5px] overflow-hidden flex-shrink-0 bg-brand-secondary/30 flex items-center justify-center">
-                        {item.avatar ? (
-                          <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="text-2xl font-bold text-brand-primary">{item.name[0]}</span>
-                        )}
+                      <div className="w-20 h-20 rounded-[5px] overflow-hidden flex-shrink-0">
+                        <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center mb-2">
@@ -359,35 +409,18 @@ export default function Search({ connections, setConnections, user, partnerConne
                           </div>
                         </div>
                         <p className="text-sm text-slate-500 mb-4 line-clamp-2">
-                          {item.isConnected && item.tags.length > 0 ? `Providing ${item.tags.join(', ')}. ${item.description}` : item.description}
+                          {item.isConnected ? `Providing ${item.tags.join(', ')}. ${item.description}` : item.description}
                         </p>
                         
                         <div className="flex flex-wrap gap-6 mb-0">
-                          {item.uid ? (
-                            <>
-                              <div className="flex items-center gap-2 text-xs font-semibold text-black">
-                                {item.orgType === 'school' ? <School size={16} className="text-brand-primary" /> : <Heart size={16} className="text-brand-primary" />}
-                                {item.orgType === 'school' ? 'School District' : 'Community Partner'}
-                              </div>
-                              {item.location && (
-                                <div className="flex items-center gap-2 text-xs font-semibold text-black">
-                                  <MapPin size={14} className="text-brand-primary" />
-                                  {item.location}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex items-center gap-2 text-xs font-semibold text-black">
-                                {getSupplyIcon(item.tags[0])}
-                                {item.quantity} {item.tags[0]}
-                              </div>
-                              <div className="flex items-center gap-2 text-xs font-semibold text-black">
-                                <MapPin size={14} className="text-brand-primary" />
-                                {item.distance}
-                              </div>
-                            </>
-                          )}
+                          <div className="flex items-center gap-2 text-xs font-semibold text-black">
+                            {getSupplyIcon(item.tags[0])}
+                            {item.quantity} {item.tags[0]}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs font-semibold text-black">
+                            <MapPin size={14} className="text-brand-primary" />
+                            {item.distance}
+                          </div>
                           {item.availableUntil && (
                             <div className="flex items-center gap-2 text-xs font-semibold text-black">
                               <Calendar size={14} className="text-brand-primary" />
@@ -402,22 +435,19 @@ export default function Search({ connections, setConnections, user, partnerConne
                             {item.postedAt}
                           </span>
                         ) : <div />}
-
-                        <div className="flex flex-col gap-2">
-                          {item.uid && renderConnectButton(item)}
-                          <button
-                            onClick={() => handleOpenRequestModal(item)}
-                            disabled={sentIds.includes(item.id)}
-                            className={cn(
-                              "w-[140px] py-2.5 rounded-[5px] font-bold text-sm transition-all",
-                              sentIds.includes(item.id)
-                                ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                                : "bg-brand-primary hover:bg-brand-dark text-white hover:scale-[1.02] active:scale-[0.98]"
-                            )}
-                          >
-                            {sentIds.includes(item.id) ? 'Sent' : 'Send Request'}
-                          </button>
-                        </div>
+                        
+                        <button 
+                          onClick={() => handleOpenRequestModal(item)}
+                          disabled={isSent}
+                          className={cn(
+                            "w-[140px] py-2.5 rounded-[5px] font-bold text-sm transition-all",
+                            isSent
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                              : "bg-brand-primary hover:bg-brand-dark text-white hover:scale-[1.02] active:scale-[0.98]"
+                          )}
+                        >
+                          {isSent ? 'Sent' : 'Send Request'}
+                        </button>
                       </div>
                     </motion.div>
                   );
