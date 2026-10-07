@@ -8,22 +8,27 @@ import { db } from './firebase';
 import { User, UserType } from '../types';
 
 export async function getUserProfile(uid: string): Promise<Partial<User> & { userType?: UserType }> {
-  const snapshot = await getDoc(doc(db, 'users', uid));
-  if (!snapshot.exists()) return {};
-  const data = snapshot.data();
-  return {
-    id: uid,
-    name: data.orgName ?? data.contactName ?? 'Your Organization',
-    type: data.userType,
-    email: data.email,
-    contactName: data.contactName,
-    avatar: data.avatar,
-    location: data.location,
-    availability: data.availability,
-    dropOffLocation: data.dropOffLocation,
-    needDropOffAssistance: data.needDropOffAssistance,
-    profileAnswers: data.profileAnswers,
-    setupCompletedAt: data.setupCompletedAt,
-    setupSkippedAt: data.setupSkippedAt,
-  };
+  try {
+    const snapshot = await getDoc(doc(db, 'users', uid));
+    if (!snapshot.exists()) return {};
+    const data = snapshot.data();
+    return {
+      id: uid,
+      name: data.orgName ?? data.contactName ?? 'Your Organization',
+      type: data.userType,
+      email: data.email,
+      contactName: data.contactName,
+      avatar: data.avatar,
+      location: data.location,
+      availability: data.availability,
+      dropOffLocation: data.dropOffLocation,
+      needDropOffAssistance: data.needDropOffAssistance,
+      profileAnswers: data.profileAnswers,
+      setupCompletedAt: data.setupCompletedAt,
+      setupSkippedAt: data.setupSkippedAt,
+    };
+  } catch (err) {
+    console.warn('Could not load user profile from Firestore:', err);
+    return {};
+  }
 }

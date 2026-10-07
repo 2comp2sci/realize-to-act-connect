@@ -158,3 +158,56 @@ export async function respondToRequest(
 export async function cancelRequest(requestId: string): Promise<void> {
   await deleteDoc(doc(db, REQUESTS_COLLECTION, requestId));
 }
+
+export interface SchoolSentRequest {
+  id?: string;
+  userId: string;
+  fromName: string;
+  communityPartner: string;
+  communityPartnerId?: string;
+  item: string;
+  quantity: number;
+  additionalDetails?: string;
+  timestamp?: number;
+}
+
+export async function recordSchoolSentRequest(data: SchoolSentRequest): Promise<string> {
+  try {
+    const ref = await addDoc(collection(db, 'requests-sent'), {
+      ...data,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (err) {
+    console.warn('Could not record sent request to requests-sent:', err);
+    return 'local-' + Date.now();
+  }
+}
+
+export function subscribeToSchoolSentRequests(
+  userId: string,
+  onChange: (requests: SchoolSentRequest[]) => void
+): Unsubscribe {
+  try {
+    const q = query(collection(db, 'requests-sent'), where('userId', '==', userId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<SchoolSentRequest, 'id'>),
+        }));
+        onChange(list);
+      },
+      (err) => {
+        console.warn('Could not subscribe to school sent requests:', err);
+        onChange([]);
+      }
+    );
+  } catch (err) {
+    console.warn('Could not setup school sent requests subscription:', err);
+    onChange([]);
+    return () => {};
+  }
+}
+

@@ -15,9 +15,10 @@ interface SearchProps {
   connections: ConnectionRequest[];
   setConnections: React.Dispatch<React.SetStateAction<ConnectionRequest[]>>;
   user?: User;
+  partnerConnections?: any;
 }
 
-export default function Search({ connections, setConnections, user }: SearchProps) {
+export default function Search({ connections, setConnections, user, partnerConnections }: SearchProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [radius, setRadius] = useState(50);

@@ -25,11 +25,33 @@ import { subscribeToConnections } from './lib/connections';
 // mostly-empty profile.
 async function loadUser(uid: string, fallbackType: UserType): Promise<User> {
   const profile = await getUserProfile(uid);
+  const localCompleted = typeof window !== 'undefined' ? localStorage.getItem(`setupCompleted_${uid}`) : null;
+  const localSkipped = typeof window !== 'undefined' ? localStorage.getItem(`setupSkipped_${uid}`) : null;
+  const localAnswers = typeof window !== 'undefined' ? localStorage.getItem(`profileAnswers_${uid}`) : null;
+  const localLocation = typeof window !== 'undefined' ? localStorage.getItem(`location_${uid}`) : null;
+
+  let parsedAnswers = profile.profileAnswers;
+  if (!parsedAnswers && localAnswers) {
+    try {
+      parsedAnswers = JSON.parse(localAnswers);
+    } catch (e) {}
+  }
+
+  const effectiveType = profile.type ?? fallbackType;
+  const defaultName = effectiveType === 'community-partner' 
+    ? (uid === 'demo-partner-user' ? 'Hope Feeling Foundation' : 'Community Partner Organization')
+    : MOCK_USER.name;
+
   return {
     ...MOCK_USER,
+    name: profile.name || (uid.startsWith('demo-') ? (effectiveType === 'community-partner' ? 'Hope Feeling Foundation' : 'Midland Elementary School') : defaultName),
     ...profile,
     id: uid,
-    type: profile.type ?? fallbackType,
+    type: effectiveType,
+    setupCompletedAt: profile.setupCompletedAt || localCompleted || undefined,
+    setupSkippedAt: profile.setupSkippedAt || localSkipped || undefined,
+    profileAnswers: parsedAnswers,
+    location: profile.location || localLocation || MOCK_USER.location,
   };
 }
 

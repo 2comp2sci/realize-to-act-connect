@@ -1,22 +1,21 @@
 {
-  "name": "react-example",
+  "name": "realize-to-act-connect",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "start": "node server.ts",
+    "dev": "vite",
+    "start": "vite preview --host 0.0.0.0 --port 3000",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "deploy": "npm run build && npx firebase-tools deploy --only hosting,firestore:rules,firestore:indexes"
+    "deploy": "npm run clean && npm run build && npx firebase-tools deploy --only hosting,firestore:rules,firestore:indexes"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
-    "better-sqlite3": "^12.4.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
@@ -40,7 +39,6 @@
   },
   "allowScripts": {
     "firebase@12.18.0": true,
-    "better-sqlite3@12.11.1": true,
     "esbuild@0.28.2": true,
     "esbuild@0.25.12": true,
     "protobufjs@7.6.6": true

@@ -372,6 +372,28 @@ export default function Auth({ onLogin }: AuthProps) {
                     </svg>
                     Log in with Google
                   </button>
+
+                  <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col gap-2">
+                    <p className="text-xs font-semibold text-slate-400 text-center uppercase tracking-wider mb-1">
+                      Quick Demo Preview
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => onLogin('school', 'demo-school-user')}
+                        className="py-2.5 px-3 text-xs font-semibold text-brand-dark bg-slate-100 hover:bg-brand-secondary rounded-[5px] transition-colors text-center"
+                      >
+                        Demo School District
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onLogin('community-partner', 'demo-partner-user')}
+                        className="py-2.5 px-3 text-xs font-semibold text-brand-dark bg-slate-100 hover:bg-brand-secondary rounded-[5px] transition-colors text-center"
+                      >
+                        Demo Community Partner
+                      </button>
+                    </div>
+                  </div>
                 </motion.div>
               )}
 
