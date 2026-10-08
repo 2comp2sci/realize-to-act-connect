@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Auth from './Auth';
 import Layout from './Layout';
 import Dashboard from './Dashboard';
@@ -9,15 +8,16 @@ import Documents from './Documents';
 import Messages from './Messages';
 import Profile from './Profile';
 import Search from './Search';
-import PartnerAbout, { PartnerSummary } from './PartnerAbout';
-import ProfileSetup from './ProfileSetup';
-import { User, UserType, ConnectionRequest, Chat, Document, Connection } from './types';
-import { MOCK_USER, MOCK_DOCUMENTS as INITIAL_DOCUMENTS } from './mockData';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import ProfileSetup from './components/ProfileSetup';
+import { User, UserType, ConnectionRequest, Chat, Document } from './types';
+import { MOCK_USER } from './mockData';
 import { auth } from './lib/firebase';
 import { getUserProfile } from './lib/users';
 import { subscribeToRequests } from './lib/requests';
 import { subscribeToChats } from './lib/chats';
-import { subscribeToConnections } from './lib/connections';
+import { subscribeToDocuments } from './lib/documents';
+import { saveOrganizationProfile, skipProfileSetup } from './lib/profiles';
 
 // Builds the in-app User object for a signed-in Firebase uid, layering the
 // Firestore "users/{uid}" profile (org name, availability, etc.) on top of
@@ -38,7 +38,7 @@ async function loadUser(uid: string, fallbackType: UserType): Promise<User> {
   }
 
   const effectiveType = profile.type ?? fallbackType;
-  const defaultName = effectiveType === 'community-partner' 
+  const defaultName = effectiveType === 'community-partner'
     ? (uid === 'demo-partner-user' ? 'Hope Feeling Foundation' : 'Community Partner Organization')
     : MOCK_USER.name;
 
@@ -61,15 +61,11 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionsNeededRead, setActionsNeededRead] = useState(false);
   const [connections, setConnections] = useState<ConnectionRequest[]>([]);
-  const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
-  // Organization-to-organization connections; `connections` above holds resource requests.
-  const [partnerConnections, setPartnerConnections] = useState<Connection[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState<{ text: string; isSuggestedTime?: boolean; suggestedTimes?: string[]; meetingNote?: string } | null>(null);
   const [lastActionTime, setLastActionTime] = useState<string>('');
-  const [viewingPartner, setViewingPartner] = useState<PartnerSummary | null>(null);
-  const [tabBeforePartner, setTabBeforePartner] = useState('dashboard');
 
   const updateLastAction = () => {
     const now = new Date();
@@ -97,23 +93,22 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Once we know who's signed in, subscribe to their requests and chats so
-  // "sent"/"received" messages and requests are read live from Firestore
-  // instead of the static mock arrays.
+  // Once we know who's signed in, subscribe to their requests, chats, and
+  // documents so they're read live from Firestore instead of mock arrays.
   useEffect(() => {
     if (!user) {
       setConnections([]);
       setChats([]);
-      setPartnerConnections([]);
+      setDocuments([]);
       return;
     }
     const unsubscribeRequests = subscribeToRequests(user.id, setConnections);
     const unsubscribeChats = subscribeToChats(user.id, setChats);
-    const unsubscribeConnections = subscribeToConnections(user.id, setPartnerConnections);
+    const unsubscribeDocuments = subscribeToDocuments(user.id, setDocuments);
     return () => {
       unsubscribeRequests();
       unsubscribeChats();
-      unsubscribeConnections();
+      unsubscribeDocuments();
     };
   }, [user?.id]);
 
@@ -129,21 +124,29 @@ export default function App() {
     setSelectedChatId(null);
   };
 
+  const handleProfileSetupComplete = async (updatedUserData: Partial<User>) => {
+    if (!user) return;
+    const updatedUser: User = { ...user, ...updatedUserData, setupCompletedAt: new Date().toISOString() };
+    setUser(updatedUser);
+    setActiveTab('dashboard');
+    await saveOrganizationProfile(updatedUser, { markSetupComplete: true });
+  };
+
+  const handleProfileSetupSkip = async () => {
+    if (!user) return;
+    setUser({ ...user, setupSkippedAt: new Date().toISOString() });
+    setActiveTab('dashboard');
+    await skipProfileSetup(user.id);
+  };
+
   const navigateToChat = (chatId: string) => {
     setSelectedChatId(chatId);
     setActiveTab('messages');
   };
 
-  // Opens a school/community partner's About page, remembering where the
-  // user came from so "Back" returns there.
-  const viewPartner = (partner: PartnerSummary) => {
-    if (activeTab !== 'about') setTabBeforePartner(activeTab);
-    setViewingPartner(partner);
-    setActiveTab('about');
-  };
-
   const handleUpdateUser = (updatedUser: User) => {
     setUser(updatedUser);
+    saveOrganizationProfile(updatedUser);
   };
 
   if (isLoading) {
@@ -174,14 +177,14 @@ export default function App() {
     return <Auth onLogin={handleLogin} />;
   }
 
-  // Prompt for About page details once, right after signup (or on the first
-  // login after this step was added). Skipping is remembered too.
+  // Show the onboarding flow once, right after signup (or on the first login
+  // after this step was added). Completing or skipping it is remembered.
   if (!user.setupCompletedAt && !user.setupSkippedAt) {
     return (
-      <ProfileSetup
-        user={user}
-        variant="onboarding"
-        onDone={(updates) => setUser({ ...user, ...updates })}
+      <ProfileSetup 
+        user={user} 
+        onComplete={handleProfileSetupComplete} 
+        onSkip={handleProfileSetupSkip} 
       />
     );
   }
@@ -190,7 +193,7 @@ export default function App() {
     <Layout 
       user={user} 
       activeTab={activeTab} 
-      setActiveTab={setActiveTab}
+      setActiveTab={setActiveTab} 
       onLogout={handleLogout}
       actionsNeededRead={actionsNeededRead}
       setActionsNeededRead={setActionsNeededRead}
@@ -209,7 +212,6 @@ export default function App() {
           lastActionTime={lastActionTime}
           updateLastAction={updateLastAction}
           setChats={setChats}
-          onViewPartner={viewPartner}
         />
       )}
       {activeTab === 'requests' && (
@@ -217,16 +219,6 @@ export default function App() {
           connections={connections} 
           setConnections={setConnections} 
           user={user}
-          onViewPartner={viewPartner}
-          partnerConnections={partnerConnections}
-        />
-      )}
-      {activeTab === 'about' && viewingPartner && (
-        <PartnerAbout
-          partner={viewingPartner}
-          user={user}
-          connections={connections}
-          onBack={() => setActiveTab(tabBeforePartner)}
         />
       )}
       {activeTab === 'messages' && (
@@ -255,7 +247,6 @@ export default function App() {
           connections={connections}
           setConnections={setConnections}
           user={user}
-          partnerConnections={partnerConnections}
         />
       )}
       {activeTab === 'profile' && (

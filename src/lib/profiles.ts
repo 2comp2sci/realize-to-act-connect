@@ -8,12 +8,20 @@
 //     setupCompletedAt: string (ISO)    set when the setup form is submitted
 //     setupSkippedAt:   string (ISO)    set when the user skips setup
 //
+//     orgName, contactName, contactRole, phone, location, state, about,
+//     dropOffLocation, dropOffDetails, needDropOffAssistance, teamEmails,
+//     availability, allowAvailabilityView
+//                       organization profile edited by the onboarding flow
+//                       (src/components/ProfileSetup.tsx) and src/Profile.tsx —
+//                       see saveOrganizationProfile below
+//
 //   publicProfiles/{uid}        (readable by any signed-in user)
 //     uid:       string
 //     name:      string
 //     userType:  'school' | 'community-partner'
 //     avatar:    string | null
 //     answers:   { [fieldKey]: string | string[] }   only fields marked public
+//     availability: AvailabilitySlot[] | null   only when allowAvailabilityView
 //     updatedAt: Timestamp (serverTimestamp)
 //
 // Which fields are public is defined in src/lib/profileFields.ts.
@@ -129,5 +137,72 @@ export async function skipProfileSetup(uid: string): Promise<void> {
     await setDoc(doc(db, 'users', uid), { setupSkippedAt: new Date().toISOString() }, { merge: true });
   } catch (err) {
     console.warn('Could not save skip status to Firestore:', err);
+  }
+}
+
+// Organization profile fields the app edits, mapped from the in-app User
+// shape to their names on users/{uid} (the org name is stored as `orgName`).
+const ORGANIZATION_PROFILE_FIELDS: Array<[keyof User, string]> = [
+  ['name', 'orgName'],
+  ['contactName', 'contactName'],
+  ['contactRole', 'contactRole'],
+  ['phone', 'phone'],
+  ['location', 'location'],
+  ['state', 'state'],
+  ['about', 'about'],
+  ['avatar', 'avatar'],
+  ['dropOffLocation', 'dropOffLocation'],
+  ['dropOffDetails', 'dropOffDetails'],
+  ['needDropOffAssistance', 'needDropOffAssistance'],
+  ['teamEmails', 'teamEmails'],
+  ['availability', 'availability'],
+  ['allowAvailabilityView', 'allowAvailabilityView'],
+];
+
+/**
+ * Saves the organization profile from the onboarding flow or the Profile page
+ * to users/{uid}, and republishes the public subset (name, about, location,
+ * and — if the organization allows it — drop-off availability) to
+ * publicProfiles/{uid}. Pass `markSetupComplete` from the onboarding flow so
+ * it isn't shown again on the next login.
+ */
+export async function saveOrganizationProfile(user: User, options: { markSetupComplete?: boolean } = {}): Promise<void> {
+  const completedAt = new Date().toISOString();
+  if (options.markSetupComplete) {
+    try {
+      localStorage.setItem(`setupCompleted_${user.id}`, completedAt);
+    } catch (e) {}
+  }
+
+  if (!auth.currentUser || user.id.startsWith('demo-') || user.id === 'user-1') {
+    return;
+  }
+
+  const privateData: Record<string, unknown> = {};
+  for (const [key, field] of ORGANIZATION_PROFILE_FIELDS) {
+    // Firestore rejects undefined values, so unset fields are left untouched.
+    if (user[key] !== undefined) privateData[field] = user[key];
+  }
+  if (options.markSetupComplete) privateData.setupCompletedAt = completedAt;
+
+  const publicAnswers: ProfileAnswers = {};
+  if (user.about) publicAnswers.about = user.about;
+  if (user.location) publicAnswers.location = user.location;
+
+  try {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'users', user.id), privateData, { merge: true });
+    batch.set(doc(db, PUBLIC_PROFILES_COLLECTION, user.id), {
+      uid: user.id,
+      name: user.name,
+      userType: user.type,
+      avatar: user.avatar ?? null,
+      answers: publicAnswers,
+      availability: user.allowAvailabilityView !== false ? (user.availability ?? null) : null,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    await batch.commit();
+  } catch (err) {
+    console.warn('Could not save organization profile to Firestore:', err);
   }
 }

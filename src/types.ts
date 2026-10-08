@@ -13,12 +13,84 @@ export interface User {
   avatar?: string;
   location?: string;
   contactName?: string;
+  contactPerson?: string;
+  contactRole?: string;
+  role?: string;
+  phone?: string;
+  about?: string;
+  state?: string;
   availability?: AvailabilitySlot[];
   dropOffLocation?: string;
+  dropOffDetails?: string;
+  teamEmails?: string[];
   needDropOffAssistance?: boolean;
+  allowAvailabilityView?: boolean;
   profileAnswers?: Record<string, string | string[]>;
   setupCompletedAt?: string;
   setupSkippedAt?: string;
+}
+
+export interface SchoolResourceRequest {
+  id?: string;
+  submittedAt?: string;
+  schoolName: string;
+  contactName: string;
+  contactRole: string;
+  email: string;
+  phone: string;
+  state: string;
+  requestScope: 'district' | 'school';
+  districtSchoolsCount?: number;
+  districtStudentsCount?: number;
+  schoolStudentsCount?: number;
+  expectedStudentsInNeed: number;
+  selectedCategories: string[];
+  backpacks?: {
+    gradeBands: string[];
+    solidQty: number;
+    clearQty: number;
+    mandateStatus?: string;
+  };
+  schoolSupplies?: {
+    packagedKits: boolean;
+    kitPackagingPreference?: string;
+    items: { [itemName: string]: number };
+    deliveryMethod?: string;
+  };
+  hygiene?: {
+    items: { [itemName: string]: number };
+    sprayDeodorant?: boolean;
+    stickDeodorant?: boolean;
+    pads?: boolean;
+    tampons?: boolean;
+    gradeBands: string[];
+  };
+  cleaning?: {
+    items: { [itemName: string]: number };
+  };
+  clothing?: {
+    garmentTypes: string[];
+    kidsSizes: string[];
+    adultSizes: string[];
+    shoeSizes: string[];
+  };
+  food?: {
+    categories: string[];
+    snacks: string[];
+    nonperishables: string[];
+    frozen: string[];
+  };
+  enrichment?: {
+    timeForKids: boolean;
+    whatSparksYouWorkshop: boolean;
+    stemKits: boolean;
+    notes?: string;
+  };
+  logistics?: {
+    method: string;
+    eventDate?: string;
+    specialInstructions?: string;
+  };
 }
 
 export interface ConnectionRequest {
@@ -38,6 +110,7 @@ export interface ConnectionRequest {
   description?: string;
   availability?: AvailabilitySlot[];
   isNew?: boolean;
+  schoolRequestData?: SchoolResourceRequest;
 }
 
 // A LinkedIn-style connection between two organizations (src/lib/connections.ts),

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { User, ConnectionRequest } from './types';
-import ProfileSetup from './ProfileSetup';
+import Tag from './components/Tag';
 
 interface ProfileProps {
   user: User;
@@ -18,16 +18,18 @@ interface ProfileProps {
 export default function Profile({ user, onLogout, connections, onUpdateUser }: ProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState<string | null>(null);
-  const [isEditingAboutPage, setIsEditingAboutPage] = useState(false);
-  const [about, setAbout] = useState('');
+  const [about, setAbout] = useState(user.about || '');
   const [dropOffLocation, setDropOffLocation] = useState(user.dropOffLocation || '');
-  const [allowAvailabilityView, setAllowAvailabilityView] = useState(true);
+  const [dropOffDetails, setDropOffDetails] = useState(user.dropOffDetails || '');
+  const [allowAvailabilityView, setAllowAvailabilityView] = useState(user.allowAvailabilityView !== undefined ? user.allowAvailabilityView : true);
   const [availabilitySlots, setAvailabilitySlots] = useState(user.availability || []);
   const [needDropOffAssistance, setNeedDropOffAssistance] = useState(user.needDropOffAssistance || false);
   const [isSendingRequest, setIsSendingRequest] = useState(false);
   const [teamMembers, setTeamMembers] = useState([
     { email: user.email, role: 'Owner', isPrimary: true, status: 'Active' },
-    { email: 'admin@school.edu', role: 'Admin', isPrimary: false, status: 'Invited' }
+    ...(user.teamEmails && user.teamEmails.length > 0
+      ? user.teamEmails.map(email => ({ email, role: 'Admin', isPrimary: false, status: 'Invited' }))
+      : [{ email: 'admin@school.edu', role: 'Admin', isPrimary: false, status: 'Invited' }])
   ]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
 
@@ -66,9 +68,13 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
   const handleSaveProfile = () => {
     onUpdateUser({
       ...user,
+      about,
       dropOffLocation,
+      dropOffDetails,
       availability: availabilitySlots,
-      needDropOffAssistance
+      needDropOffAssistance,
+      allowAvailabilityView,
+      teamEmails: teamMembers.filter(m => !m.isPrimary).map(m => m.email)
     });
     setIsEditing(false);
   };
@@ -92,7 +98,7 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header>
-        <h1 className="text-3xl font-bold text-brand-dark mb-2">Your Profile</h1>
+        <h1 className="text-3xl font-serif font-bold text-brand-dark mb-2">Your Profile</h1>
         <p className="text-slate-500">Manage your account information and setting preferences.</p>
       </header>
 
@@ -156,15 +162,33 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
                         value={dropOffLocation}
                         onChange={(e) => setDropOffLocation(e.target.value)}
                         placeholder="e.g., Main Entrance, Reception Desk, Room 102..."
-                        className="w-full px-4 py-2.5 rounded-[5px] border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
+                        className="w-full px-4 py-2.5 rounded-[5px] border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 text-sm"
                       />
                     ) : (
                       <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 p-3 rounded-[5px] border border-slate-100">
-                        <MapPin size={16} className="text-brand-primary" />
-                        {dropOffLocation || 'No drop-off location specified.'}
+                        <MapPin size={16} className="text-brand-primary shrink-0" />
+                        <span>{dropOffLocation || 'No drop-off location specified.'}</span>
                       </div>
                     )}
                     <p className="text-[10px] text-slate-500 mt-1">Specify where community partners should drop off donations in the building.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-bold text-brand-dark mb-2">Drop-off & Delivery Instructions</h4>
+                    {isEditing ? (
+                      <textarea 
+                        rows={2}
+                        value={dropOffDetails}
+                        onChange={(e) => setDropOffDetails(e.target.value)}
+                        placeholder="e.g., Loading dock directions, door buzzer code, check-in instructions..."
+                        className="w-full px-4 py-2.5 rounded-[5px] border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 text-sm leading-relaxed"
+                      />
+                    ) : (
+                      <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-[5px] border border-slate-100">
+                        {dropOffDetails || 'No specific delivery instructions provided.'}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-slate-500 mt-1">Delivery details for volunteer handoffs and dock access.</p>
                   </div>
                 </div>
               )}
@@ -180,23 +204,6 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
                 ) : (
                   <p className="text-sm text-slate-400 italic">{about || 'No additional information listed.'}</p>
                 )}
-              </div>
-
-              <div className="p-4 bg-brand-secondary/10 rounded-[5px] border border-brand-secondary/20 flex items-center justify-between gap-4">
-                <div>
-                  <span className="text-sm font-bold text-brand-dark block">Your About Page</span>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    {user.setupCompletedAt
-                      ? 'What organizations see when they open your profile from a request.'
-                      : "You haven't set up your About page yet."}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsEditingAboutPage(true)}
-                  className="px-4 py-2 rounded-[5px] bg-brand-primary text-white text-xs font-bold hover:bg-brand-dark transition-all whitespace-nowrap"
-                >
-                  {user.setupCompletedAt ? 'Edit About Page' : 'Set Up'}
-                </button>
               </div>
 
               <div>
@@ -227,14 +234,14 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
                               key={slot} 
                               onClick={() => !needDropOffAssistance && toggleSlot(i, slot)}
                               className={cn(
-                                "h-10 rounded-[5px] flex items-center justify-center text-[10px] font-bold transition-all cursor-default",
+                                "h-10 rounded-[5px] flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer select-none",
                                 isEditing 
                                   ? isSelected 
-                                    ? "border border-slate-100 text-slate-400 bg-white" 
-                                    : "border-2 border-dashed border-slate-200 text-slate-300 hover:border-brand-primary/30"
+                                    ? "border border-slate-200 text-slate-600 bg-slate-50/70 hover:bg-slate-100 shadow-none font-bold" 
+                                    : "border-2 border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-500 font-medium bg-white"
                                   : isSelected 
-                                    ? "border border-slate-200 text-slate-700 bg-white hover:bg-slate-50" 
-                                    : "bg-transparent"
+                                    ? "border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 shadow-none font-bold" 
+                                    : "bg-transparent pointer-events-none"
                               )}
                             >
                               {isSelected ? slot : (isEditing && slot)}
@@ -349,27 +356,27 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
 
             <div className="space-y-4 mb-8">
               {teamMembers.map((member, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 rounded-[5px] bg-slate-50 border border-slate-100">
+                <div key={idx} className="flex items-center justify-between p-4 rounded-[5px] bg-slate-50 border border-slate-200/80">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-brand-secondary flex items-center justify-center text-brand-primary text-xs font-bold">
+                    <div className="w-8 h-8 rounded-[5px] bg-brand-secondary/60 flex items-center justify-center text-brand-primary text-xs font-bold border border-brand-primary/20">
                       {member.email[0].toUpperCase()}
                     </div>
                     <div>
                       <p className="text-sm font-bold text-brand-dark">{member.email}</p>
-                      <p className="text-[10px] text-slate-500">{member.role} {member.isPrimary && '• Primary'}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Tag label={member.role} variant="neutral" size="sm" />
+                        {member.isPrimary && <Tag label="Primary" variant="subtle" size="sm" />}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {member.status === 'Invited' && (
-                      <div className="px-3 py-1 bg-slate-100 text-slate-400 text-[10px] font-bold rounded-full flex items-center gap-1.5 cursor-not-allowed opacity-70">
-                        <MailCheck size={12} />
-                        Awaiting response...
-                      </div>
+                      <Tag label="Awaiting response..." variant="status-pending" size="sm" />
                     )}
                     {!member.isPrimary && (
                       <button 
                         onClick={() => setTeamMembers(prev => prev.filter((_, i) => i !== idx))}
-                        className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-red-600 transition-colors cursor-pointer rounded-[4px]"
                         title="Remove member"
                       >
                         <Trash2 size={16} />
@@ -385,8 +392,8 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
                 type="email"
                 value={newMemberEmail}
                 onChange={(e) => setNewMemberEmail(e.target.value)}
-                placeholder="Enter email address..."
-                className="flex-1 px-4 py-2 rounded-[5px] border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 text-sm"
+                placeholder="Enter colleague or administrator email address..."
+                className="flex-1 px-4 py-2.5 rounded-[5px] border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 text-sm"
               />
               <button 
                 onClick={() => {
@@ -395,10 +402,10 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
                     setNewMemberEmail('');
                   }
                 }}
-                className="px-4 py-2 bg-brand-primary text-white rounded-[5px] font-bold text-sm hover:bg-brand-dark transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                className="px-5 py-2.5 bg-brand-primary hover:bg-brand-dark text-white rounded-[5px] font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-none"
               >
-                <Plus size={16} />
-                Add
+                <Plus size={15} />
+                <span>Add Member</span>
               </button>
             </div>
           </section>
@@ -439,18 +446,6 @@ export default function Profile({ user, onLogout, connections, onUpdateUser }: P
           </section>
         </div>
       </div>
-
-      {isEditingAboutPage && (
-        <ProfileSetup
-          user={user}
-          variant="edit"
-          onDone={(updates) => {
-            onUpdateUser({ ...user, ...updates });
-            setIsEditingAboutPage(false);
-          }}
-          onClose={() => setIsEditingAboutPage(false)}
-        />
-      )}
 
       {/* Settings Modals */}
       {showSettingsModal && (

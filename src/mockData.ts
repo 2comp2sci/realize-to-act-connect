@@ -8,6 +8,9 @@ export const MOCK_USER = {
   avatar: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&auto=format&fit=crop',
   location: 'Midland, Ohio',
   contactName: 'Jane Doe',
+  contactRole: 'Resource Coordinator',
+  phone: '(555) 342-8921',
+  about: 'Serving over 600 students with dedicated programs in literacy, STEM education, and essential family support services.',
   availability: [
     { day: 'MON', slots: ['8:00 AM', '9:00 AM', '10:00 AM'] },
     { day: 'TUES', slots: ['11:00 AM'] },
@@ -15,7 +18,9 @@ export const MOCK_USER = {
     { day: 'THURS', slots: ['11:00 AM'] },
     { day: 'FRI', slots: [] },
   ],
-  dropOffLocation: 'Main Entrance, Reception Desk'
+  dropOffLocation: 'Main Entrance, Reception Desk',
+  dropOffDetails: 'Check in at main office desk or delivery dock door #3.',
+  teamEmails: ['admin@school.edu', 'resource-team@school.edu']
 };
 
 export const MOCK_CONNECTIONS: ConnectionRequest[] = [
@@ -78,7 +83,56 @@ export const MOCK_CONNECTIONS: ConnectionRequest[] = [
       { day: 'FRI', slots: ['2:00 PM', '3:00 PM'] },
     ],
     postedAt: 'Just now',
-    availableUntil: '3 days'
+    availableUntil: '3 days',
+    schoolRequestData: {
+      id: 'req-midland-fall-2026',
+      submittedAt: 'Aug 18, 2026',
+      schoolName: 'Midland Public Schools',
+      contactName: 'Jane Doe',
+      contactRole: 'Resource Coordinator',
+      email: 'midland@school.edu',
+      phone: '(555) 234-5678',
+      state: 'Ohio',
+      requestScope: 'school',
+      schoolStudentsCount: 520,
+      expectedStudentsInNeed: 140,
+      selectedCategories: ['Backpacks', 'School Supplies', 'Hygiene Products'],
+      backpacks: {
+        gradeBands: ['Kindergarten - 2nd Grade', '3rd - 5th Grade'],
+        solidQty: 90,
+        clearQty: 50,
+        mandateStatus: 'No mandate'
+      },
+      schoolSupplies: {
+        packagedKits: true,
+        kitPackagingPreference: 'Pre-packed inside backpacks',
+        items: {
+          'Wide-Ruled Spiral Notebooks': 120,
+          'No. 2 Wood Pencils (12-pk)': 140,
+          '24-Pack Crayola Crayons': 100,
+          'Glue Sticks': 160,
+          'Over-Ear Student Headphones': 60
+        },
+        deliveryMethod: 'Packed inside backpacks for back-to-school kickoff'
+      },
+      hygiene: {
+        items: {
+          'Deodorant (Stick/Spray)': 100,
+          'Toothbrush & Toothpaste Kits': 120,
+          'Pocket Hand Sanitizers': 140
+        },
+        sprayDeodorant: true,
+        stickDeodorant: true,
+        pads: true,
+        tampons: false,
+        gradeBands: ['3rd - 5th Grade', 'Middle School']
+      },
+      logistics: {
+        method: 'Realize to Act volunteer drop-off direct to school',
+        eventDate: 'August 24th, 9:00 AM',
+        specialInstructions: 'Main Entrance, Reception Desk. Ask for Jane Doe.'
+      }
+    }
   },
   {
     id: 'conn-3',
@@ -145,58 +199,137 @@ export const MOCK_CONNECTIONS: ConnectionRequest[] = [
 export const MOCK_SEARCH_USERS = [
   {
     id: 'search-1',
-    name: 'Community Food Bank',
+    name: 'Community Food Bank & Pantry',
     type: 'partner',
     avatar: 'https://images.unsplash.com/photo-1594708767771-a7502209ff51?w=150&h=150&fit=crop',
     location: 'Downtown Midland',
     distance: '1.2 mi away',
     distanceValue: 1.2,
-    description: 'Dedicated to serving families in need and ensuring that no one in our community is left behind.',
-    tags: ['Food', 'Community'],
+    description: 'Providing weekend student snack bags, nutritious non-perishables, and family food boxes to local school communities.',
+    category: 'food',
+    tags: ['Food & Nutrition', 'Weekend Snack Packs', 'Shelf-Stable Meals'],
     quantity: 500,
     postedAt: '1 day ago',
     availableUntil: '3 days'
   },
   {
     id: 'search-2',
-    name: 'Tech for All',
+    name: 'Tech for All Digital Access',
     type: 'partner',
     avatar: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=150&h=150&fit=crop',
     location: 'University Circle',
     distance: '3.5 mi away',
     distanceValue: 3.5,
-    description: 'Our mission is to bridge the digital divide and provide technological access for students in underserved communities.',
-    tags: ['Technology', 'Education'],
-    quantity: 25,
+    description: 'Bridging the digital divide with refurbished student Chromebooks, charging accessories, and learning tablets for underserved classrooms.',
+    category: 'technology',
+    tags: ['Technology & Devices', 'Chromebooks', 'Tablets'],
+    quantity: 35,
     postedAt: '4 hours ago',
     availableUntil: '1 week'
   },
   {
     id: 'search-3',
-    name: 'Clean Start Hygiene',
+    name: 'Clean Start Hygiene Initiative',
     type: 'partner',
     avatar: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=150&h=150&fit=crop',
     location: 'West Side',
     distance: '2.8 mi away',
     distanceValue: 2.8,
-    description: 'Committed to improving community health and well-being by distributing essential care items to those who need them most.',
-    tags: ['Hygiene', 'Health'],
-    quantity: 150,
+    description: 'Supporting youth dignity with deodorant packs, menstrual care kits, toothbrush sets, and pocket hygiene care.',
+    category: 'hygiene',
+    tags: ['Hygiene & Personal Care', 'Deodorant', 'Menstrual Care'],
+    quantity: 180,
     postedAt: '6 hours ago',
     availableUntil: '5 days'
   },
   {
     id: 'search-4',
-    name: 'Scholastic Support',
+    name: 'Scholastic & Literacy Partners',
     type: 'partner',
     avatar: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=150&h=150&fit=crop',
     location: 'East Midland',
     distance: '4.1 mi away',
     distanceValue: 4.1,
-    description: 'Empowering students through literacy and education by supporting schools with essential classroom support.',
-    tags: ['Education', 'Books'],
+    description: 'Empowering early literacy with grade-band leveled readers, diverse chapter books, and classroom library book packs.',
+    category: 'books',
+    tags: ['Books & Literacy', 'Early Readers (K-2)', 'Chapter Books'],
     quantity: 300,
     postedAt: '2 days ago',
+    availableUntil: '2 weeks'
+  },
+  {
+    id: 'search-5',
+    name: 'Pack The Future Alliance',
+    type: 'partner',
+    avatar: 'https://images.unsplash.com/photo-1588072432836-e10032774350?w=150&h=150&fit=crop',
+    location: 'North Midland',
+    distance: '1.8 mi away',
+    distanceValue: 1.8,
+    description: 'Supplying heavy-duty solid color backpacks and clear transparent backpacks tailored to district security mandates.',
+    category: 'backpacks',
+    tags: ['Backpacks', 'Solid Color', 'Clear Transparent'],
+    quantity: 250,
+    postedAt: '5 hours ago',
+    availableUntil: '10 days'
+  },
+  {
+    id: 'search-6',
+    name: 'Classroom Essentials Network',
+    type: 'partner',
+    avatar: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=150&h=150&fit=crop',
+    location: 'Midland Civic Center',
+    distance: '2.1 mi away',
+    distanceValue: 2.1,
+    description: 'Distributing individually pre-packaged school supply kits, wide-ruled notebooks, pencils, crayons, and student headphones.',
+    category: 'school-supplies',
+    tags: ['School Supplies', 'Individually Packaged Kits', 'Notebooks'],
+    quantity: 400,
+    postedAt: '3 hours ago',
+    availableUntil: '2 weeks'
+  },
+  {
+    id: 'search-7',
+    name: 'Warmth & Wear Student Clothing',
+    type: 'partner',
+    avatar: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=150&h=150&fit=crop',
+    location: 'South District',
+    distance: '3.2 mi away',
+    distanceValue: 3.2,
+    description: 'Dedicated to keeping students warm with winter coats, hoodies, clean socks, and standard uniform polo shirts.',
+    category: 'clothing',
+    tags: ['Clothing & Apparel', 'Winter Coats', 'Hoodies'],
+    quantity: 120,
+    postedAt: '1 day ago',
+    availableUntil: '1 week'
+  },
+  {
+    id: 'search-8',
+    name: 'Safe & Clean School Environments',
+    type: 'partner',
+    avatar: 'https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=150&h=150&fit=crop',
+    location: 'Industrial Park',
+    distance: '4.8 mi away',
+    distanceValue: 4.8,
+    description: 'Providing schools with disinfectant wipes, classroom hand sanitizer pump jugs, and paper towel multi-packs.',
+    category: 'cleaning',
+    tags: ['Cleaning Supplies', 'Disinfecting Wipes', 'Sanitizer Jugs'],
+    quantity: 160,
+    postedAt: '12 hours ago',
+    availableUntil: '6 days'
+  },
+  {
+    id: 'search-9',
+    name: 'NextGen STEM & Creative Arts',
+    type: 'partner',
+    avatar: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=150&h=150&fit=crop',
+    location: 'Tech District',
+    distance: '2.5 mi away',
+    distanceValue: 2.5,
+    description: 'Inspiring future innovators through hands-on STEM experiment kits, Time for Kids magazines, and art materials.',
+    category: 'stem',
+    tags: ['STEM & Enrichment', 'STEM Kits', 'Art Materials'],
+    quantity: 85,
+    postedAt: '1 day ago',
     availableUntil: '2 weeks'
   }
 ];
@@ -204,23 +337,25 @@ export const MOCK_SEARCH_USERS = [
 export const MOCK_SUGGESTED_MATCHES = [
   {
     id: 'suggest-1',
-    name: 'Global Education Initiative',
-    avatar: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=150&h=150&fit=crop',
-    description: 'Providing global resources for local schools.',
-    tags: ['Education', 'Global'],
-    item: 'Educational Kits',
-    quantity: 100,
-    distance: '5 mi away'
+    name: 'Pack The Future Alliance',
+    avatar: 'https://images.unsplash.com/photo-1588072432836-e10032774350?w=150&h=150&fit=crop',
+    description: 'Ready to fulfill elementary solid color and clear transparent backpack requests.',
+    category: 'backpacks',
+    tags: ['Backpacks', 'Solid Color'],
+    item: 'Backpacks',
+    quantity: 250,
+    distance: '1.8 mi away'
   },
   {
     id: 'suggest-2',
-    name: 'Healthy Kids Foundation',
-    avatar: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=150&h=150&fit=crop',
-    description: 'Focusing on nutrition and health for students.',
-    tags: ['Health', 'Food'],
-    item: 'Nutrition Bars',
+    name: 'Community Food Bank & Pantry',
+    avatar: 'https://images.unsplash.com/photo-1594708767771-a7502209ff51?w=150&h=150&fit=crop',
+    description: 'Weekend student snack bags and shelf-stable nutritional packs.',
+    category: 'food',
+    tags: ['Food & Nutrition', 'Weekend Snack Packs'],
+    item: 'Nutrition Packs',
     quantity: 500,
-    distance: '3.2 mi away'
+    distance: '1.2 mi away'
   }
 ];
 

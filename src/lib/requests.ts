@@ -15,6 +15,9 @@
 //   distance:     string
 //   description:  string
 //   availability: AvailabilitySlot[] | null
+//   schoolRequestData: SchoolResourceRequest | null   resource manifest (categories,
+//                                   items, grade bands, logistics) attached by the
+//                                   Search page's supply request form
 //   status:       'pending' | 'approved' | 'denied'
 //   createdAt:    Timestamp (serverTimestamp)
 //   updatedAt:    Timestamp (serverTimestamp)
@@ -36,7 +39,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { AvailabilitySlot, ConnectionRequest } from '../types';
+import { AvailabilitySlot, ConnectionRequest, SchoolResourceRequest } from '../types';
 
 const REQUESTS_COLLECTION = 'requests';
 
@@ -52,10 +55,23 @@ export interface NewRequestInput {
   distance?: string;
   description?: string;
   availability?: AvailabilitySlot[];
+  schoolRequestData?: SchoolResourceRequest;
+}
+
+/** Short relative time ("Just now", "5 mins ago", "3 days ago") for request cards. */
+export function formatTimeAgo(timestamp: number): string {
+  const minutes = Math.floor((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 function toConnectionRequest(id: string, data: DocumentData, viewerUid: string): ConnectionRequest {
   const isSent = data.fromUid === viewerUid;
+  const timestamp = data.createdAt?.toMillis?.() ?? Date.now();
   return {
     id,
     fromId: isSent ? (data.toUid ?? 'everyone') : data.fromUid,
@@ -66,11 +82,12 @@ function toConnectionRequest(id: string, data: DocumentData, viewerUid: string):
     item: data.item,
     quantity: data.quantity,
     distance: data.distance ?? 'N/A',
-    timeAgo: '',
-    timestamp: data.createdAt?.toMillis?.() ?? Date.now(),
+    timeAgo: formatTimeAgo(timestamp),
+    timestamp,
     description: data.description ?? undefined,
     availability: data.availability ?? undefined,
     isNew: data.status === 'pending' && !isSent,
+    schoolRequestData: data.schoolRequestData ?? undefined,
   };
 }
 
@@ -128,6 +145,8 @@ export async function createRequest(input: NewRequestInput): Promise<string> {
     distance: input.distance ?? 'N/A',
     description: input.description ?? '',
     availability: input.availability ?? null,
+    // JSON round-trip drops undefined optional fields, which Firestore rejects.
+    schoolRequestData: input.schoolRequestData ? JSON.parse(JSON.stringify(input.schoolRequestData)) : null,
     status: 'pending',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

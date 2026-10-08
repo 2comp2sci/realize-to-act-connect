@@ -98,6 +98,34 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid in resource.data.participantUids;
     }
 
+    // --- Per-partner log of supply requests a school sent from Search (src/lib/requests.ts) ---
+    match /requests-sent/{entryId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // --- Acknowledgement letters awaiting signature (src/lib/documents.ts) ---
+    match /documents/{documentId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participantUids;
+
+      // Created by the approver, for exactly two participants including themselves.
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.participantUids.size() == 2 &&
+        request.auth.uid in request.resource.data.participantUids &&
+        request.resource.data.status == 'pending';
+
+      // Either participant can sign; nothing else about the letter can change.
+      allow update: if isSignedIn() &&
+        request.auth.uid in resource.data.participantUids &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'signedDate', 'updatedAt']) &&
+        request.resource.data.status == 'signed';
+
+      // Either participant can reject/remove a letter.
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.participantUids;
+    }
+
     // --- Chats & messages (Messages.tsx "messages sent" & "messages received") ---
     match /chats/{chatId} {
       allow read, update: if isSignedIn() && request.auth.uid in resource.data.participantUids;

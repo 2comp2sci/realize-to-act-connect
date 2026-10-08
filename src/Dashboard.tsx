@@ -9,10 +9,11 @@ import { motion } from 'motion/react';
 import { cn } from './lib/utils';
 import { MOCK_CONNECTIONS, MOCK_DOCUMENTS, MOCK_SUGGESTED_MATCHES } from './mockData';
 import { User, ConnectionRequest, Document, Chat } from './types';
+import Tag from './components/Tag';
 import { respondToRequest } from './lib/requests';
 import { ensureChat } from './lib/chats';
-import { PartnerSummary } from './PartnerAbout';
 import { connectOnApprovedRequest } from './lib/connections';
+import { createDocument } from './lib/documents';
 
 interface DashboardProps {
   user: User;
@@ -27,7 +28,6 @@ interface DashboardProps {
   lastActionTime: string;
   updateLastAction: () => void;
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
-  onViewPartner: (partner: PartnerSummary) => void;
 }
 
 export default function Dashboard({ 
@@ -36,7 +36,7 @@ export default function Dashboard({
   connections, setConnections,
   documents, setDocuments,
   lastActionTime, updateLastAction,
-  setChats, onViewPartner
+  setChats
 }: DashboardProps) {
   const pendingConnections = connections.filter(c => c.status === 'pending' && c.type === 'received');
   const pendingDocs = documents.filter(d => d.status === 'pending');
@@ -60,18 +60,18 @@ export default function Dashboard({
       ).catch(err => console.error('Auto-connect failed', err));
       updateLastAction();
 
-      // Add to pending signatures
-      const newDoc: Document = {
-        id: `doc-${Date.now()}`,
+      // Add to pending signatures — the documents subscription in App.tsx
+      // pushes the new letter back into `documents`.
+      await createDocument({
+        ownerUid: user.id,
+        partnerUid: connection.fromId,
+        requestId: id,
         title: `Letter of Acknowledgement - ${connection.fromName}`,
         fromName: connection.fromName,
         toName: user.name,
-        status: 'pending',
         dueDate: 'Due in 7 days',
-        timeAgo: 'Just now',
         itemDescription: `approved ${connection.quantity} ${connection.item}`,
-      };
-      setDocuments(prev => [newDoc, ...prev]);
+      }).catch(err => console.error('Could not create acknowledgement letter', err));
     }
   };
 
@@ -165,7 +165,7 @@ export default function Dashboard({
           <section className="bg-white rounded-[5px] p-8 shadow-none border border-slate-100">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-xl font-bold text-brand-dark mb-1">Suggested Matches</h2>
+                <h2 className="text-xl font-serif font-bold text-brand-dark mb-1">Suggested Matches</h2>
                 <p className="text-sm text-slate-500">Based on your needs and location, these partners might be a good fit.</p>
               </div>
             </div>
@@ -179,16 +179,13 @@ export default function Dashboard({
                 >
                   <img src={match.avatar} alt={match.name} className="w-12 h-12 rounded-[5px] object-cover" />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-brand-dark truncate transition-colors">{match.name}</h3>
+                    <h3 className="text-sm font-bold text-brand-dark group-hover:text-brand-dark truncate">{match.name}</h3>
                     <p className="text-[10px] text-slate-500 mb-2 truncate">{match.description}</p>
                     <div className="flex flex-col gap-2">
-                      <div className="flex flex-wrap gap-3">
-                        <span className="text-xs font-semibold text-black flex items-center gap-1.5">
-                          {getSupplyIcon(match.item || '')}
-                          {match.quantity} {match.item}
-                        </span>
-                        <span className="text-xs font-semibold text-black flex items-center gap-1.5">
-                          <MapPin size={14} className="text-brand-primary" />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Tag label={`${match.quantity} ${match.item}`} variant="category" size="sm" />
+                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                          <MapPin size={12} className="text-brand-primary" />
                           {match.distance}
                         </span>
                       </div>
@@ -212,62 +209,42 @@ export default function Dashboard({
               {pendingConnections.length > 0 ? (
                 pendingConnections.map((conn) => (
                   <div key={conn.id} className="p-4 rounded-[5px] border border-slate-100 hover:border-brand-primary/20 transition-all flex flex-col sm:flex-row gap-4">
-                    <button
-                      onClick={() => onViewPartner({ uid: conn.fromId, name: conn.fromName, avatar: conn.fromAvatar })}
-                      className="w-16 h-16 rounded-[5px] overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity"
-                    >
+                    <div className="w-16 h-16 rounded-[5px] overflow-hidden flex-shrink-0 border border-slate-200">
                       <img src={conn.fromAvatar} alt={conn.fromName} className="w-full h-full object-cover" />
-                    </button>
+                    </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-1">
-                        <button
-                          onClick={() => onViewPartner({ uid: conn.fromId, name: conn.fromName, avatar: conn.fromAvatar })}
-                          className="font-bold text-brand-dark text-left hover:text-brand-primary hover:underline"
-                        >
-                          {conn.fromName}
-                        </button>
-                        <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-black text-[10px] font-medium opacity-50">Pending</span>
+                      <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+                        <h3 className="font-bold text-brand-dark text-base">{conn.fromName}</h3>
+                        <Tag label={conn.status} variant="status-pending" size="sm" />
                       </div>
-                      <p className="text-sm text-slate-500 line-clamp-2 mb-3">{conn.description}</p>
-                      <div className="flex flex-wrap gap-4 text-xs font-semibold text-black">
-                        <span className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-brand-secondary/30 flex items-center justify-center text-brand-primary">
-                            {conn.item.toLowerCase().includes('textbook') || conn.item.toLowerCase().includes('notebook') ? (
-                              <BookOpen size={12} />
-                            ) : conn.item.toLowerCase().includes('backpack') ? (
-                              <Backpack size={12} />
-                            ) : conn.item.toLowerCase().includes('art supplies') ? (
-                              <Pencil size={12} />
-                            ) : (
-                              <div className="w-1.5 h-1.5 rounded-full bg-brand-primary" />
-                            )}
-                          </div>
-                          {conn.quantity} {conn.item}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-brand-secondary/30 flex items-center justify-center text-brand-primary">
-                            <MapPin size={12} />
-                          </div>
+                      <p className="text-xs text-slate-500 line-clamp-2 mb-3 leading-relaxed">{conn.description}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Tag label={`${conn.quantity} ${conn.item}`} variant="category" size="sm" />
+                        <span className="flex items-center gap-1 text-xs text-slate-500 font-medium">
+                          <MapPin size={12} className="text-brand-primary" />
                           {conn.distance}
                         </span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end justify-between sm:w-32">
                       <span className="text-xs text-slate-400 whitespace-nowrap">{conn.timeAgo}</span>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-2">
                         {conn.fromName !== 'Youth Empowerment Fund' && (
                           <>
                             <button 
                               onClick={() => handleApprove(conn.id)}
-                              className="p-2 hover:bg-green-50 text-green-600 rounded-[5px] transition-colors"
+                              className="px-3 py-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold rounded-[5px] transition-all flex items-center gap-1 cursor-pointer shadow-none"
+                              title="Approve request"
                             >
-                              <Check size={20} />
+                              <Check size={14} />
+                              <span>Approve</span>
                             </button>
                             <button 
                               onClick={() => handleReject(conn.id)}
-                              className="p-2 hover:bg-red-50 text-red-600 rounded-[5px] transition-colors"
+                              className="px-2.5 py-1.5 border border-slate-200 hover:border-red-200 text-slate-600 hover:text-red-600 hover:bg-red-50/60 text-xs font-semibold rounded-[5px] transition-all cursor-pointer shadow-none"
+                              title="Deny request"
                             >
-                              <X size={20} />
+                              <X size={14} />
                             </button>
                           </>
                         )}
@@ -335,10 +312,10 @@ export default function Dashboard({
                   <div className="flex items-center justify-between gap-4">
                     <div className={cn(
                       "flex items-center gap-2 text-xs font-bold",
-                      doc.dueDate.toLowerCase().includes('tomorrow') ? "text-red-500" : "text-brand-primary"
+                      (doc.dueDate ?? '').toLowerCase().includes('tomorrow') ? "text-red-500" : "text-brand-primary"
                     )}>
                       <Calendar size={14} className={cn(
-                        doc.dueDate.toLowerCase().includes('tomorrow') ? "text-red-500" : "text-brand-primary"
+                        (doc.dueDate ?? '').toLowerCase().includes('tomorrow') ? "text-red-500" : "text-brand-primary"
                       )} />
                       {doc.dueDate}
                     </div>

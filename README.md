@@ -20,11 +20,13 @@ Many features are broken. Will release separate .md detailing features in progre
 
 ## Backend: Firebase Auth + Firestore
 -- this is more specific to this app.
-Messages, chats, and connection/supply requests (sent & received) are stored
-in Cloud Firestore and read live via `onSnapshot` — there is no separate
-server. The data-access code lives in `src/lib/requests.ts` and
-`src/lib/chats.ts`; the schema and security rules are documented at the top
-of those files and in `firestore.rules`.
+Messages, chats, connection/supply requests (sent & received, including the
+resource manifest in `schoolRequestData`), organization profiles, and
+acknowledgement letters awaiting signature are stored in Cloud Firestore and
+read live via `onSnapshot` — there is no separate server. The data-access
+code lives in `src/lib/` (`requests.ts`, `chats.ts`, `connections.ts`,
+`profiles.ts`, `users.ts`, `documents.ts`); the schema and security rules are
+documented at the top of those files and in `firestore.rules`.
 
 ### One-time Firebase project setup
 --done already on MM laptop (mine)
@@ -49,7 +51,8 @@ npm run deploy   # builds, then deploys Hosting + Firestore rules/indexes
 `firebase deploy --only hosting,firestore:rules,firestore:indexes`, which
 pushes:
 - `dist/` (the Vite build output) to Firebase Hosting, per `firebase.json`.
-- `firestore.rules` — access control for the `users`, `requests`, and
+- `firestore.rules` — access control for the `users`, `publicProfiles`,
+  `requests`, `requests-sent`, `connections`, `documents`, and
   `chats`/`messages` collections.
 - `firestore.indexes.json` — composite indexes required by the
   `subscribeToRequests`/`subscribeToChats` queries.
