@@ -2,13 +2,17 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
 
+// Firebase web config for the realize-to-act-connect project. These values
+// are not secrets (they ship in every built bundle); access is enforced by
+// firestore.rules and Firebase Auth. VITE_FIREBASE_* env vars override them,
+// e.g. to point a local build at a different project.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDummyKeyForDevelopmentAndDemo1234",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCFgAH1z0PbSa0yJQXsYlVQl3zclzF_9YU",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "realize-to-act-connect.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "realize-to-act-connect",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "realize-to-act-connect.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1234567890",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1234567890:web:abcdef123456",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "realize-to-act-connect.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "592699387827",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:592699387827:web:f6b8de557ca07de50465c6",
 };
 
 const app = initializeApp(firebaseConfig);
